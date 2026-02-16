@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Snake | الثعبان المتوهج</title>
+    <style>
+        body { margin: 0; background: #020617; color: #38bdf8; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: none; }
+        canvas { border: 3px solid #38bdf8; box-shadow: 0 0 20px #38bdf8; background: #000; max-width: 90vw; max-height: 60vh; border-radius: 10px; }
+        .score-board { font-size: 1.5rem; margin-bottom: 10px; text-shadow: 0 0 10px #38bdf8; }
+        .controls { display: grid; grid-template-columns: repeat(3, 65px); gap: 10px; margin-top: 20px; }
+        .btn { width: 65px; height: 65px; background: rgba(56, 189, 248, 0.2); border: 2px solid #38bdf8; color: #38bdf8; border-radius: 50%; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+        .btn:active { background: #38bdf8; color: #000; box-shadow: 0 0 20px #38bdf8; }
+        .up { grid-column: 2; } .left { grid-column: 1; } .down { grid-column: 2; } .right { grid-column: 3; }
+    </style>
+</head>
+<body>
+
+    <div class="score-board">النقاط: <span id="score">0</span></div>
+    <canvas id="snakeGame" width="400" height="400"></canvas>
+
+    <div class="controls">
+        <button class="btn up" onclick="changeDir('up')">↑</button>
+        <button class="btn left" onclick="changeDir('left')">←</button>
+        <button class="btn down" onclick="changeDir('down')">↓</button>
+        <button class="btn right" onclick="changeDir('right')">→</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("snakeGame");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+
+        let box = 20;
+        let score = 0;
+        let snake = [{ x: 10 * box, y: 10 * box }];
+        let food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
+        let d = "RIGHT";
+
+        function changeDir(dir) {
+            if (dir === "up" && d !== "DOWN") d = "UP";
+            else if (dir === "down" && d !== "UP") d = "DOWN";
+            else if (dir === "left" && d !== "RIGHT") d = "LEFT";
+            else if (dir === "right" && d !== "LEFT") d = "RIGHT";
+        }
+
+        function draw() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // رسم الثعبان بتأثير النيون
+            for (let i = 0; i < snake.length; i++) {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "#38bdf8";
+                ctx.fillStyle = (i === 0) ? "#38bdf8" : "#0ea5e9";
+                ctx.fillRect(snake[i].x, snake[i].y, box, box);
+                ctx.shadowBlur = 0;
+            }
+
+            // رسم الطعام
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = "#fb7185";
+            ctx.fillStyle = "#fb7185";
+            ctx.beginPath();
+            ctx.arc(food.x + box/2, food.y + box/2, box/2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            if (d === "UP") snakeY -= box;
+            if (d === "DOWN") snakeY += box;
+            if (d === "LEFT") snakeX -= box;
+            if (d === "RIGHT") snakeX += box;
+
+            // إذا أكل الثعبان الطعام
+            if (snakeX === food.x && snakeY === food.y) {
+                score++;
+                scoreElement.innerHTML = score;
+                food = { x: Math.floor(Math.random() * 19 + 1) * box, y: Math.floor(Math.random() * 19 + 1) * box };
+            } else {
+                snake.pop();
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            // قوانين الخسارة
+            if (snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || collision(newHead, snake)) {
+                clearInterval(game);
+                alert("انتهت اللعبة! نقاطك: " + score);
+                location.reload();
+            }
+
+            snake.unshift(newHead);
+        }
+
+        function collision(head, array) {
+            for (let i = 0; i < array.length; i++) {
+                if (head.x === array[i].x && head.y === array[i].y) return true;
+            }
+            return false;
+        }
+
+        let game = setInterval(draw, 120);
+    </script>
+</body>
+</html>
