@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ninja Shadow Legend</title>
+    <title>Ninja City Legend</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        canvas { display: block; }
+        canvas { display: block; background: #0f172a; /* لون سماء الليل */ }
         .ui-layer { position: absolute; top: 15px; left: 15px; color: gold; font-size: 22px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 10; pointer-events: none; }
         .controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-around; align-items: center; z-index: 20; padding: 0 10px; box-sizing: border-box; }
         .btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.1); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; backdrop-filter: blur(4px); }
@@ -36,69 +36,81 @@
 
         let score = 0;
         let health = 100;
-        let cameraX = 0;
 
         let player = {
             x: 100, y: 0, w: 40, h: 60,
             dy: 0, jumpForce: 16, gravity: 0.7,
             grounded: false, vx: 0, speed: 6,
-            isAttacking: false, attackTimer: 0
+            isAttacking: false, attackTimer: 0,
+            facingRight: true // اتجاه اللاعب
         };
 
-        // مصفوفات للأعداء والفلوس
-        let coins = [];
-        let enemies = [];
-        for(let i=0; i<50; i++) {
-            coins.push({x: 500 + i*300 + Math.random()*200, y: canvas.height - 150, collected: false});
-            enemies.push({x: 800 + i*600, y: canvas.height - 100, w: 40, h: 40, dead: false});
-        }
+        // تصميم مستويات بسيطة (أماكن الأعداء والعملات)
+        let levelObjects = [
+            // مباني كخلفية
+            {type: 'building', x: 200, y: canvas.height - 200, w: 100, h: 150},
+            {type: 'building', x: 400, y: canvas.height - 250, w: 120, h: 200},
+            {type: 'building', x: 700, y: canvas.height - 180, w: 90, h: 130},
+            
+            // منصات (للقفز عليها)
+            {type: 'platform', x: 300, y: canvas.height - 150, w: 100, h: 20},
+            {type: 'platform', x: 550, y: canvas.height - 220, w: 80, h: 20},
+
+            // عملات
+            {type: 'coin', x: 250, y: canvas.height - 100, collected: false},
+            {type: 'coin', x: 450, y: canvas.height - 180, collected: false},
+            {type: 'coin', x: 600, y: canvas.height - 260, collected: false},
+
+            // أعداء
+            {type: 'enemy', x: 350, y: canvas.height - 100, w: 40, h: 40, dead: false, speed: 1},
+            {type: 'enemy', x: 650, y: canvas.height - 100, w: 40, h: 40, dead: false, speed: 1}
+        ];
 
         function drawNinja(x, y) {
             ctx.save();
-            ctx.translate(x - cameraX, y);
+            ctx.translate(x, y);
+            if (!player.facingRight) { // لو اللاعب متجه شمال، اقلبه
+                ctx.scale(-1, 1);
+                ctx.translate(-player.w, 0); // ظبط مكانه بعد القلب
+            }
             
             // سيف النينجا
             if (player.isAttacking) {
                 ctx.strokeStyle = "silver";
                 ctx.lineWidth = 5;
-                ctx.beginPath(); ctx.moveTo(40, 30); ctx.lineTo(80, 10); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(player.w - 10, 30); ctx.lineTo(player.w + 30, 10); ctx.stroke();
             }
 
-            // الجسم
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 10, 30, 40);
-            ctx.fillStyle = "#e74c3c"; ctx.fillRect(-2, 25, 34, 6); // الحزام
-            ctx.fillStyle = "black";
-            ctx.beginPath(); ctx.arc(15, 0, 15, 0, Math.PI*2); ctx.fill(); // الرأس
-            ctx.fillStyle = "white"; ctx.fillRect(18, -5, 10, 3); // العين
+            // الجسم والرأس والعين والحزام
+            ctx.fillStyle = "black"; ctx.fillRect(0, 10, 30, 40);
+            ctx.fillStyle = "#e74c3c"; ctx.fillRect(-2, 25, 34, 6);
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(15, 0, 15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "white"; ctx.fillRect(18, -5, 10, 3);
             ctx.restore();
         }
 
         function drawWorld() {
-            // سماء متحركة
-            let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            grad.addColorStop(0, "#0f0c29"); grad.addColorStop(1, "#302b63");
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // الأرضية
+            ctx.fillStyle = "#222"; // لون أرضية المدينة
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
 
-            // أرضية متحركة مع الكاميرا
-            ctx.fillStyle = "#1a1a1a";
-            ctx.fillRect(0 - (cameraX % canvas.width), canvas.height - 50, canvas.width, 50);
-            ctx.fillRect(canvas.width - (cameraX % canvas.width), canvas.height - 50, canvas.width, 50);
-
-            // رسم العملات
-            coins.forEach(c => {
-                if(!c.collected) {
+            levelObjects.forEach(obj => {
+                if (obj.type === 'building') {
+                    ctx.fillStyle = "#333";
+                    ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                    // نوافذ
+                    ctx.fillStyle = "#7f8c8d";
+                    ctx.fillRect(obj.x + 10, obj.y + 20, 15, 15);
+                    ctx.fillRect(obj.x + obj.w - 25, obj.y + 40, 15, 15);
+                } else if (obj.type === 'platform') {
+                    ctx.fillStyle = "#4a4a4a";
+                    ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                } else if (obj.type === 'coin' && !obj.collected) {
                     ctx.fillStyle = "gold";
-                    ctx.beginPath(); ctx.arc(c.x - cameraX, c.y, 10, 0, Math.PI*2); ctx.fill();
-                }
-            });
-
-            // رسم الأعداء
-            enemies.forEach(e => {
-                if(!e.dead) {
+                    ctx.beginPath(); ctx.arc(obj.x, obj.y, 10, 0, Math.PI*2); ctx.fill();
+                } else if (obj.type === 'enemy' && !obj.dead) {
                     ctx.fillStyle = "#c0392b";
-                    ctx.fillRect(e.x - cameraX, e.y, e.w, e.h);
+                    ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
                 }
             });
         }
@@ -108,32 +120,54 @@
             player.y += player.dy;
             player.x += player.vx;
 
-            // الكاميرا تتبع اللاعب
-            cameraX = player.x - 100;
+            // اصطدام بأطراف الشاشة
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.w > canvas.width) player.x = canvas.width - player.w;
 
+            // اصطدام بالأرض
             if (player.y + player.h > canvas.height - 50) {
                 player.y = canvas.height - 50 - player.h;
                 player.dy = 0;
                 player.grounded = true;
-            }
+            } else { player.grounded = false; }
+
+            // اصطدام بالمنصات
+            levelObjects.forEach(obj => {
+                if (obj.type === 'platform' &&
+                    player.x < obj.x + obj.w && player.x + player.w > obj.x &&
+                    player.y + player.h > obj.y && player.y + player.h < obj.y + obj.h + 10 && player.dy >= 0) {
+                    player.y = obj.y - player.h;
+                    player.dy = 0;
+                    player.grounded = true;
+                }
+            });
 
             // جمع العملات
-            coins.forEach(c => {
-                if(!c.collected && Math.abs(player.x - c.x) < 30 && Math.abs(player.y - c.y) < 50) {
-                    c.collected = true; score += 10;
+            levelObjects.forEach(obj => {
+                if (obj.type === 'coin' && !obj.collected &&
+                    Math.abs(player.x - obj.x) < 30 && Math.abs(player.y - obj.y) < 50) {
+                    obj.collected = true; score += 10;
                     document.getElementById('coins').innerText = score;
                 }
             });
 
-            // قتال الأعداء
-            enemies.forEach(e => {
-                if(!e.dead) {
-                    let dist = Math.abs(player.x - e.x);
-                    if(player.isAttacking && dist < 100) e.dead = true;
-                    else if(dist < 40 && Math.abs(player.y - e.y) < 40) {
-                        health -= 0.5;
-                        document.getElementById('health').innerText = Math.floor(health);
-                        if(health <= 0) location.reload();
+            // قتال الأعداء والتصادم
+            levelObjects.forEach(obj => {
+                if (obj.type === 'enemy' && !obj.dead) {
+                    // حركة العدو (بسيطة)
+                    obj.x += obj.speed;
+                    if (obj.x > canvas.width - obj.w || obj.x < 0) obj.speed *= -1;
+
+                    // تصادم مع اللاعب
+                    if(player.x < obj.x + obj.w && player.x + player.w > obj.x &&
+                       player.y < obj.y + obj.h && player.y + player.h > obj.y) {
+                        if (player.isAttacking) {
+                            obj.dead = true;
+                        } else {
+                            health -= 1;
+                            document.getElementById('health').innerText = Math.floor(health);
+                            if (health <= 0) alert('انتهت اللعبة! نقاطك: ' + score); location.reload();
+                        }
                     }
                 }
             });
@@ -145,14 +179,15 @@
         }
 
         function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawWorld();
             drawNinja(player.x, player.y);
             update();
             requestAnimationFrame(loop);
         }
 
-        document.getElementById('lBtn').ontouchstart = () => player.vx = -player.speed;
-        document.getElementById('rBtn').ontouchstart = () => player.vx = player.speed;
+        document.getElementById('lBtn').ontouchstart = () => { player.vx = -player.speed; player.facingRight = false; };
+        document.getElementById('rBtn').ontouchstart = () => { player.vx = player.speed; player.facingRight = true; };
         document.getElementById('lBtn').ontouchend = document.getElementById('rBtn').ontouchend = () => player.vx = 0;
         document.getElementById('jBtn').ontouchstart = () => { if(player.grounded) player.dy = -player.jumpForce; };
         document.getElementById('aBtn').ontouchstart = () => { player.isAttacking = true; player.attackTimer = 15; };
