@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sief Pro Adventure</title>
+    <title>Ninja Sief Adventure</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #1a2a6c; touch-action: none; font-family: sans-serif; }
         canvas { display: block; background: linear-gradient(#1a2a6c, #b21f1f, #fdbb2d); width: 100vw; height: 100vh; }
-        .ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; text-shadow: 2px 2px 5px #000; z-index: 10; pointer-events: none; }
-        .controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-around; padding: 0 20px; box-sizing: border-box; z-index: 20; }
-        .btn { width: 75px; height: 75px; background: rgba(255, 255, 255, 0.15); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; backdrop-filter: blur(5px); -webkit-tap-highlight-color: transparent; }
-        .btn:active { background: rgba(255, 255, 255, 0.5); transform: scale(0.9); }
+        .score { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; text-shadow: 2px 2px #000; z-index: 10; }
+        .controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-around; z-index: 20; }
+        .btn { width: 70px; height: 70px; background: rgba(255, 255, 255, 0.2); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; backdrop-filter: blur(5px); }
+        .btn:active { background: rgba(255, 255, 255, 0.5); }
     </style>
 </head>
 <body>
 
-    <div class="ui">النقاط: <span id="score">0</span></div>
+    <div class="score">المسافة: <span id="meters">0</span>m</div>
     <canvas id="gameCanvas"></canvas>
 
     <div class="controls">
@@ -23,7 +23,7 @@
             <div class="btn" id="lBtn">←</div>
             <div class="btn" id="rBtn">→</div>
         </div>
-        <div class="btn" id="jBtn" style="border-color: #ffde59; color: #ffde59;">↑</div>
+        <div class="btn" id="jBtn" style="border-color: #ffde59;">↑</div>
     </div>
 
     <script>
@@ -32,69 +32,62 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // تحميل صورة الشخصية (Sprite Sheet)
-        const charImg = new Image();
-        charImg.src = 'https://raw.githubusercontent.com/Sd92/Mario-Game/master/images/mario.png'; // صورة ماريو أصلية
-
         let player = {
             x: 50, y: 0, w: 40, h: 60,
-            frame: 0, 
-            sx: 200, // إحداثيات الصورة
             dy: 0, jumpForce: 18, gravity: 0.8,
-            grounded: false, vx: 0, speed: 7
+            grounded: false, vx: 0, speed: 7,
+            legAngle: 0 // حركة الرجلين
         };
 
-        function drawPlayer() {
-            // "قص" الصورة وتحريكها
-            let spriteW = 16, spriteH = 32; // مقاس ماريو في الصورة الأصلية
-            let frameX = (Math.floor(player.frame) % 3) * 20 + 200; // تحريك الرجلين
-            
-            ctx.drawImage(charImg, frameX, 0, spriteW, spriteH, player.x, player.y, player.w, player.h);
-            
-            if (player.vx !== 0) player.frame += 0.2; // سرعة تبديل الرجلين
+        function drawNinja(x, y) {
+            // الرأس والقناع
+            ctx.fillStyle = "black";
+            ctx.beginPath(); ctx.arc(x + 20, y + 10, 12, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "white"; // العين
+            ctx.fillRect(x + 25, y + 5, 8, 3);
+            // الجسم
+            ctx.fillStyle = "black";
+            ctx.fillRect(x + 10, y + 22, 20, 25);
+            ctx.fillStyle = "#e74c3c"; // الحزام
+            ctx.fillRect(x + 8, y + 35, 24, 5);
+            // حركة الرجلين (Animation)
+            ctx.fillStyle = "black";
+            let legMove = Math.sin(player.legAngle) * 10;
+            if (player.vx === 0) legMove = 0;
+            ctx.fillRect(x + 10, y + 47, 8, 10 + legMove); // رجل 1
+            ctx.fillRect(x + 22, y + 47, 8, 10 - legMove); // رجل 2
         }
 
         function update() {
             player.dy += player.gravity;
             player.y += player.dy;
             player.x += player.vx;
+            if (player.vx !== 0) player.legAngle += 0.2;
 
-            // اصطدام بالأرض
             if (player.y + player.h > canvas.height - 50) {
                 player.y = canvas.height - 50 - player.h;
                 player.dy = 0;
                 player.grounded = true;
             }
-
-            document.getElementById('score').innerText = Math.floor(player.x);
+            document.getElementById('meters').innerText = Math.floor(player.x);
         }
 
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // رسم أرضية احترافية
-            ctx.fillStyle = "#4d2a00";
+            // أرضية
+            ctx.fillStyle = "#34495e";
             ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-            ctx.fillStyle = "#2ecc71";
-            ctx.fillRect(0, canvas.height - 60, canvas.width, 10);
-
-            drawPlayer();
+            drawNinja(player.x, player.y);
             update();
             requestAnimationFrame(animate);
         }
 
-        // الأوامر
-        const startLeft = () => player.vx = -player.speed;
-        const startRight = () => player.vx = player.speed;
-        const stop = () => { player.vx = 0; player.frame = 0; };
-        const jump = () => { if(player.grounded) { player.dy = -player.jumpForce; player.grounded = false; } };
+        document.getElementById('lBtn').ontouchstart = () => player.vx = -player.speed;
+        document.getElementById('rBtn').ontouchstart = () => player.vx = player.speed;
+        document.getElementById('lBtn').ontouchend = document.getElementById('rBtn').ontouchend = () => player.vx = 0;
+        document.getElementById('jBtn').ontouchstart = () => { if(player.grounded) player.dy = -player.jumpForce; };
 
-        document.getElementById('lBtn').ontouchstart = startLeft;
-        document.getElementById('rBtn').ontouchstart = startRight;
-        document.getElementById('lBtn').ontouchend = document.getElementById('rBtn').ontouchend = stop;
-        document.getElementById('jBtn').ontouchstart = jump;
-
-        charImg.onload = animate;
+        animate();
     </script>
 </body>
 </html>
