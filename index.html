@@ -3,27 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ninja Sief Adventure</title>
+    <title>Ninja Shadow Legend</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #1a2a6c; touch-action: none; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(#1a2a6c, #b21f1f, #fdbb2d); width: 100vw; height: 100vh; }
-        .score { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; text-shadow: 2px 2px #000; z-index: 10; }
-        .controls { position: fixed; bottom: 30px; width: 100%; display: flex; justify-content: space-around; z-index: 20; }
-        .btn { width: 70px; height: 70px; background: rgba(255, 255, 255, 0.2); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; color: white; backdrop-filter: blur(5px); }
-        .btn:active { background: rgba(255, 255, 255, 0.5); }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        canvas { display: block; }
+        .ui-layer { position: absolute; top: 15px; left: 15px; color: gold; font-size: 22px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 10; pointer-events: none; }
+        .controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-around; align-items: center; z-index: 20; padding: 0 10px; box-sizing: border-box; }
+        .btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.1); border: 2px solid white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; backdrop-filter: blur(4px); }
+        .btn:active { background: rgba(255, 255, 255, 0.4); transform: scale(0.9); }
+        .attack-btn { background: rgba(231, 76, 60, 0.3); border-color: #e74c3c; color: #e74c3c; width: 80px; height: 80px; font-size: 35px; }
     </style>
 </head>
 <body>
 
-    <div class="score">المسافة: <span id="meters">0</span>m</div>
+    <div class="ui-layer">🪙 العملات: <span id="coins">0</span> | 🩸 الصحة: <span id="health">100</span>%</div>
     <canvas id="gameCanvas"></canvas>
 
     <div class="controls">
-        <div style="display: flex; gap: 15px;">
+        <div style="display: flex; gap: 10px;">
             <div class="btn" id="lBtn">←</div>
             <div class="btn" id="rBtn">→</div>
         </div>
-        <div class="btn" id="jBtn" style="border-color: #ffde59;">↑</div>
+        <div class="btn attack-btn" id="aBtn">⚔️</div>
+        <div class="btn" id="jBtn">↑</div>
     </div>
 
     <script>
@@ -32,62 +34,130 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        let score = 0;
+        let health = 100;
+        let cameraX = 0;
+
         let player = {
-            x: 50, y: 0, w: 40, h: 60,
-            dy: 0, jumpForce: 18, gravity: 0.8,
-            grounded: false, vx: 0, speed: 7,
-            legAngle: 0 // حركة الرجلين
+            x: 100, y: 0, w: 40, h: 60,
+            dy: 0, jumpForce: 16, gravity: 0.7,
+            grounded: false, vx: 0, speed: 6,
+            isAttacking: false, attackTimer: 0
         };
 
+        // مصفوفات للأعداء والفلوس
+        let coins = [];
+        let enemies = [];
+        for(let i=0; i<50; i++) {
+            coins.push({x: 500 + i*300 + Math.random()*200, y: canvas.height - 150, collected: false});
+            enemies.push({x: 800 + i*600, y: canvas.height - 100, w: 40, h: 40, dead: false});
+        }
+
         function drawNinja(x, y) {
-            // الرأس والقناع
-            ctx.fillStyle = "black";
-            ctx.beginPath(); ctx.arc(x + 20, y + 10, 12, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = "white"; // العين
-            ctx.fillRect(x + 25, y + 5, 8, 3);
+            ctx.save();
+            ctx.translate(x - cameraX, y);
+            
+            // سيف النينجا
+            if (player.isAttacking) {
+                ctx.strokeStyle = "silver";
+                ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.moveTo(40, 30); ctx.lineTo(80, 10); ctx.stroke();
+            }
+
             // الجسم
             ctx.fillStyle = "black";
-            ctx.fillRect(x + 10, y + 22, 20, 25);
-            ctx.fillStyle = "#e74c3c"; // الحزام
-            ctx.fillRect(x + 8, y + 35, 24, 5);
-            // حركة الرجلين (Animation)
+            ctx.fillRect(0, 10, 30, 40);
+            ctx.fillStyle = "#e74c3c"; ctx.fillRect(-2, 25, 34, 6); // الحزام
             ctx.fillStyle = "black";
-            let legMove = Math.sin(player.legAngle) * 10;
-            if (player.vx === 0) legMove = 0;
-            ctx.fillRect(x + 10, y + 47, 8, 10 + legMove); // رجل 1
-            ctx.fillRect(x + 22, y + 47, 8, 10 - legMove); // رجل 2
+            ctx.beginPath(); ctx.arc(15, 0, 15, 0, Math.PI*2); ctx.fill(); // الرأس
+            ctx.fillStyle = "white"; ctx.fillRect(18, -5, 10, 3); // العين
+            ctx.restore();
+        }
+
+        function drawWorld() {
+            // سماء متحركة
+            let grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, "#0f0c29"); grad.addColorStop(1, "#302b63");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // أرضية متحركة مع الكاميرا
+            ctx.fillStyle = "#1a1a1a";
+            ctx.fillRect(0 - (cameraX % canvas.width), canvas.height - 50, canvas.width, 50);
+            ctx.fillRect(canvas.width - (cameraX % canvas.width), canvas.height - 50, canvas.width, 50);
+
+            // رسم العملات
+            coins.forEach(c => {
+                if(!c.collected) {
+                    ctx.fillStyle = "gold";
+                    ctx.beginPath(); ctx.arc(c.x - cameraX, c.y, 10, 0, Math.PI*2); ctx.fill();
+                }
+            });
+
+            // رسم الأعداء
+            enemies.forEach(e => {
+                if(!e.dead) {
+                    ctx.fillStyle = "#c0392b";
+                    ctx.fillRect(e.x - cameraX, e.y, e.w, e.h);
+                }
+            });
         }
 
         function update() {
             player.dy += player.gravity;
             player.y += player.dy;
             player.x += player.vx;
-            if (player.vx !== 0) player.legAngle += 0.2;
+
+            // الكاميرا تتبع اللاعب
+            cameraX = player.x - 100;
 
             if (player.y + player.h > canvas.height - 50) {
                 player.y = canvas.height - 50 - player.h;
                 player.dy = 0;
                 player.grounded = true;
             }
-            document.getElementById('meters').innerText = Math.floor(player.x);
+
+            // جمع العملات
+            coins.forEach(c => {
+                if(!c.collected && Math.abs(player.x - c.x) < 30 && Math.abs(player.y - c.y) < 50) {
+                    c.collected = true; score += 10;
+                    document.getElementById('coins').innerText = score;
+                }
+            });
+
+            // قتال الأعداء
+            enemies.forEach(e => {
+                if(!e.dead) {
+                    let dist = Math.abs(player.x - e.x);
+                    if(player.isAttacking && dist < 100) e.dead = true;
+                    else if(dist < 40 && Math.abs(player.y - e.y) < 40) {
+                        health -= 0.5;
+                        document.getElementById('health').innerText = Math.floor(health);
+                        if(health <= 0) location.reload();
+                    }
+                }
+            });
+
+            if (player.isAttacking) {
+                player.attackTimer--;
+                if(player.attackTimer <= 0) player.isAttacking = false;
+            }
         }
 
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // أرضية
-            ctx.fillStyle = "#34495e";
-            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+        function loop() {
+            drawWorld();
             drawNinja(player.x, player.y);
             update();
-            requestAnimationFrame(animate);
+            requestAnimationFrame(loop);
         }
 
         document.getElementById('lBtn').ontouchstart = () => player.vx = -player.speed;
         document.getElementById('rBtn').ontouchstart = () => player.vx = player.speed;
         document.getElementById('lBtn').ontouchend = document.getElementById('rBtn').ontouchend = () => player.vx = 0;
         document.getElementById('jBtn').ontouchstart = () => { if(player.grounded) player.dy = -player.jumpForce; };
+        document.getElementById('aBtn').ontouchstart = () => { player.isAttacking = true; player.attackTimer = 15; };
 
-        animate();
+        loop();
     </script>
 </body>
 </html>
